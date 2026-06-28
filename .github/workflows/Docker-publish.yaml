@@ -27,4 +27,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: harikrishnan5137/NodeLatestversion:v1
+          tags: harikrishnan5137/nodelatestversion:v1
