@@ -7,7 +7,7 @@ on:
 
 jobs:
   docker:
-    runs-on: [self-hosted, linuxhari]
+    runs-on: [self-hosted, harilinux]
 
     steps:
       # Step 1: Checkout code
