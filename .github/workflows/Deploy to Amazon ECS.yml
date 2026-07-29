@@ -39,7 +39,9 @@ env:
   ECS_TASK_DEFINITION: task-definition.json           # set this to the path to your Amazon ECS task definition
                                                       # file, e.g. .aws/task-definition.json
   CONTAINER_NAME: gha-node-app
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true       # set this to the name of the container in the
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  SUBNETS: subnet-0ae4c8dd3afdfcf2f,subnet-0a889ecc0a7248cc6  
+  SECURITY_GROUP: sg-0cf539d1bcf5b46d9                # set this to the name of the container in the
                                                       # containerDefinitions section of your task definition
 
 permissions:
@@ -87,6 +89,34 @@ jobs:
         task-definition: ${{ env.ECS_TASK_DEFINITION }}
         container-name: ${{ env.CONTAINER_NAME }}
         image: ${{ steps.build-image.outputs.image }}
+
+    - name: Check or Create ECS Service
+      shell: bash
+      run: |
+        SERVICE_EXISTS=$(aws ecs describe-services \
+        --cluster "$ECS_CLUSTER" \
+        --services "$ECS_SERVICE" \
+        --region "$AWS_REGION" \
+        --query "services[0].status" \
+        --output text 2>/dev/null || echo "MISSING")
+
+      echo "Service status: $SERVICE_EXISTS"
+
+       if [ "$SERVICE_EXISTS" = "ACTIVE" ]; 
+       then
+       echo "ECS Service already exists."
+       else
+       echo "Creating ECS Service..."
+
+        aws ecs create-service \
+        --cluster "$ECS_CLUSTER" \
+        --service-name "$ECS_SERVICE" \
+        --task-definition "$(jq -r '.family' $ECS_TASK_DEFINITION)" \
+        --desired-count 1 \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[${{ env.SUBNETS }}],securityGroups=[${{ env.SECURITY_GROUP }}],assignPublicIp=ENABLED}" \
+        --region "$AWS_REGION"
+        fi  
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
