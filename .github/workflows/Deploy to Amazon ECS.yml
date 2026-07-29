@@ -38,7 +38,7 @@ env:
   ECS_CLUSTER: My-DEVOPS-Cluster                      # set this to your Amazon ECS cluster name
   ECS_TASK_DEFINITION: task-definition.json           # set this to the path to your Amazon ECS task definition
                                                       # file, e.g. .aws/task-definition.json
-  CONTAINER_NAME: gha-node-app-1
+  CONTAINER_NAME: gha-node-app
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true       # set this to the name of the container in the
                                                       # containerDefinitions section of your task definition
 
