@@ -26,7 +26,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build the Docker image
-        run: docker build . --file FirstImage --tag "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }}
+        run: docker build . --file dockop --tag "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }}
 
       - name: Push the Docker image
         run: docker push "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }}
