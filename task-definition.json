@@ -2,7 +2,7 @@
     "taskDefinitionArn": "arn:aws:ecs:us-east-2:675344694125:task-definition/nodeapp-task:5",
     "containerDefinitions": [
         {
-            "name": "gha-node-app-1",
+            "name": "gha-node-app",
             "image": "675344694125.dkr.ecr.us-east-2.amazonaws.com/harikrishnan/my-devops-repo:latest",
             "cpu": 0,
             "portMappings": [
