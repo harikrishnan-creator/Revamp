@@ -36,7 +36,7 @@ env:
   ECR_REPOSITORY: harikrishnan/my-devops-repo         # set this to your Amazon ECR repository name
   ECS_SERVICE: gha-node-app                           # set this to your Amazon ECS service name
   ECS_CLUSTER: My-DEVOPS-Cluster                      # set this to your Amazon ECS cluster name
-  ECS_TASK_DEFINITION: nodeapp-task:5           # set this to the path to your Amazon ECS task definition
+  ECS_TASK_DEFINITION: task-definition.json           # set this to the path to your Amazon ECS task definition
                                                       # file, e.g. .aws/task-definition.json
   CONTAINER_NAME: gha-node-app-1
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true       # set this to the name of the container in the
