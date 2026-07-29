@@ -94,30 +94,29 @@ jobs:
       shell: bash
       run: |
         SERVICE_EXISTS=$(aws ecs describe-services \
-        --cluster "$ECS_CLUSTER" \
-        --services "$ECS_SERVICE" \
-        --region "$AWS_REGION" \
-        --query "services[0].status" \
-        --output text 2>/dev/null || echo "MISSING")
+          --cluster "$ECS_CLUSTER" \
+          --services "$ECS_SERVICE" \
+          --region "$AWS_REGION" \
+          --query "services[0].status" \
+          --output text 2>/dev/null || echo "MISSING")
 
-      echo "Service status: $SERVICE_EXISTS"
+        echo "Service status: $SERVICE_EXISTS"
 
-       if [ "$SERVICE_EXISTS" = "ACTIVE" ]; 
-       then
-       echo "ECS Service already exists."
-       else
-       echo "Creating ECS Service..."
+        if [ "$SERVICE_EXISTS" = "ACTIVE" ]; then
+          echo "ECS Service already exists."
+        else
+          echo "Creating ECS Service..."
 
-        aws ecs create-service \
-        --cluster "$ECS_CLUSTER" \
-        --service-name "$ECS_SERVICE" \
-        --task-definition "$(jq -r '.family' $ECS_TASK_DEFINITION)" \
-        --desired-count 1 \
-        --launch-type FARGATE \
-        --network-configuration "awsvpcConfiguration={subnets=[${{ env.SUBNETS }}],securityGroups=[${{ env.SECURITY_GROUP }}],assignPublicIp=ENABLED}" \
-        --region "$AWS_REGION"
+          aws ecs create-service \
+            --cluster "$ECS_CLUSTER" \
+            --service-name "$ECS_SERVICE" \
+            --task-definition "$(jq -r '.family' "$ECS_TASK_DEFINITION")" \
+            --desired-count 1 \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ env.SUBNETS }}],securityGroups=[${{ env.SECURITY_GROUP }}],assignPublicIp=ENABLED}" \
+            --region "$AWS_REGION"
         fi  
-
+    
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
