@@ -1,31 +1,54 @@
-name: Build and Push Docker Image
+name: Build and Push to ECR
 
 on:
-  workflow_dispatch:
-#  push:
-#    branches:
-#     - main   # or your desired branch
+ # push:
+#  branches: [ "main" ]
+#  pull_request:
+#   branches: [ "main" ]
+  workflow_dispatch:  
 
 jobs:
-  docker:
-    runs-on: [self-hosted]
+
+  build:
+
+    runs-on: self-hosted
+    env:
+     ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
 
     steps:
-      # Step 1: Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ vars.DOCKER_USERNAME }}
+          username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Build and push image
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      - name: Build the Docker image
+        run: docker build . --file FirstImage --tag "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }}
+
+      - name: Push the Docker image
+        run: docker push "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          context: .
-          push: true
-          tags: harikrishnan5137/nodelatestversion:v1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2   # change to your region
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+#      - name: Pull image from Docker Hub
+#       run: docker pull "${{ secrets.DOCKER_USERNAME }}"/my-image-name:${{ github.sha }}
+
+      - name: Tag image for ECR
+        run: |
+         docker tag "${{ secrets.DOCKER_USERNAME }}"/nodeapp:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/harikrishnan/my-devops-repo:${{ github.sha }}
+
+      - name: Push image to ECR
+        run: |
+         docker push ${{ steps.login-ecr.outputs.registry }}/harikrishnan/my-devops-repo:${{ github.sha }}  
