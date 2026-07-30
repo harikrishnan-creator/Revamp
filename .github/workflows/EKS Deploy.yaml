@@ -60,12 +60,12 @@ jobs:
       run: |
         IMAGE_URI=675344694125.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
-        sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" k8s/deployment.yaml
+        sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" k8-deployment.yaml
 
     - name: Deploy to EKS
       run: |
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8-deployment.yaml
+        kubectl apply -f k8-Service.yaml
 
     - name: Verify Deployment
       run: |
