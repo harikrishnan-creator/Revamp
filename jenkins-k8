@@ -1,0 +1,183 @@
+pipeline {
+    agent any
+    
+    environment {
+        AWS_REGION = 'us-east-2'
+        ECR_REGISTRY = '675344694125.dkr.ecr.us-east-2.amazonaws.com'
+        ECR_REPOSITORY = 'nodeapp'
+        EKS_CLUSTER = 'my-jenkins-k8-cluster'
+        EKS_NODE_GROUP = 'my-jenkins-node-group'
+        IMAGE_URI= '675344694125.dkr.ecr.us-east-2.amazonaws.com/nodeapp:latest'
+        EMAIL_TO = "krishnan.learnings07@gmail.com"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "Building Docker image..."
+                    sh """
+                        docker build -t ${ECR_REPOSITORY}:${IMAGE_TAG} -f dockop .
+                        docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+                        docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Push to ECR') {
+            steps {
+                script {
+                    withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                        echo "Logging in to ECR..."
+                        sh """
+                            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        """
+                        
+                        echo "Pushing image to ECR..."
+                        sh """
+                            docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+                        """
+                    }
+                }
+            }
+        }
+
+stage('Deploy EKS Configuration') {
+    steps {
+        script {
+            withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                sh """
+                echo "Checking if EKS cluster exists..."
+
+                CLUSTER_EXISTS=\$(aws eks describe-cluster \
+                    --name ${EKS_CLUSTER} \
+                    --region ${AWS_REGION} \
+                    --query 'cluster.status' \
+                    --output text 2>/dev/null || echo "MISSING")
+
+                if [ "\$CLUSTER_EXISTS" = "ACTIVE" ]; then
+                    echo "EKS Cluster already exists. Updating configuration..."
+
+                    # Example: update cluster version (optional)
+                    aws eks update-cluster-version \
+                        --name ${EKS_CLUSTER} \
+                        --region ${AWS_REGION} \
+                        --version 1.29
+
+                else
+                    echo "EKS Cluster not found. Creating new cluster..."
+
+                    aws eks create-cluster \
+                        --name ${EKS_CLUSTER} \
+                        --region ${AWS_REGION} \
+                        --role-arn arn:aws:iam::675344694125:role/eks-node-group-role \
+                        --resources-vpc-config \
+                        subnetIds=subnet-0733023cbcf2db21,subnet-03c3c4f19e53580d0,subnet-0185f8cff97957566,subnet-097099026c1415408,securityGroupIds=sg-0eefc0fd66a65212c
+
+                    echo "Waiting for cluster to become ACTIVE..."
+                    aws eks wait cluster-active --name my-jenkins-k8-cluster --region ${AWS_REGION}
+
+                    echo "Creating Node Group..."
+                    aws eks create-nodegroup \
+                        --cluster-name ${EKS_CLUSTER} \
+                        --nodegroup-name ${EKS_NODE_GROUP} \
+                        --subnets subnet-0733023cbcf2db21,subnet-03c3c4f19e53580d0,subnet-0185f8cff97957566,subnet-097099026c1415408 \
+                        --node-role arn:aws:iam::675344694125:role/eks-node-group-role \
+                        --scaling-config minSize=2,maxSize=4,desiredSize=2
+                fi
+                """
+            }
+        }
+    }
+}
+        
+stage('Verify EKS creation') {
+    steps {
+        script {
+            withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                echo "Waiting for EKS cluster to stabilize..."
+                sh """
+                    aws eks wait cluster-active \
+                        --name ${EKS_CLUSTER} \
+                        --region ${AWS_REGION}
+
+                    echo "Cluster is active. Waiting for node group to stabilize..."
+
+                    aws eks wait nodegroup-active \
+                        --cluster-name ${EKS_CLUSTER} \
+                        --nodegroup-name ${EKS_NODE_GROUP} \
+                        --region ${AWS_REGION}
+                """
+                echo "EKS creation successful!"
+            }
+        }
+    }
+}
+stages {
+        stage('Replace Image in Manifest') {
+            steps {
+                script {
+                    withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                        sh """
+                            IMAGE_URI=675344694125.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+                            sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" k8-deployment-jenkins.yaml
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Deploy image to EKS') {
+            steps {
+                script {
+                    withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                        sh """
+                            kubectl apply -f k8-deployment-jenkins.yaml
+                            kubectl apply -f k8-Service-jenkins.yaml
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                        sh """
+                            kubectl rollout status deployment/my-jenkins-app
+                        """
+                        echo "Deployment verified successfully!"
+                    }
+                }
+            }
+        }
+    }
+}
+    
+  post {
+    success {
+      mail(
+        to: "${EMAIL_TO}",
+        subject: "SUCCESS (${env.GIT_BRANCH}): ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Pipeline succeeded.\nBranch: ${env.GIT_BRANCH}\nBuild: #${env.BUILD_NUMBER}\nURL: ${env.BUILD_URL}"
+      )
+    }
+
+    failure {
+      mail(
+        to: "${EMAIL_TO}",
+        subject: "FAILED (${env.GIT_BRANCH}): ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Pipeline failed.\nBranch: ${env.GIT_BRANCH}\nBuild: #${env.BUILD_NUMBER}\nURL: ${env.BUILD_URL}"
+      )
+    }
+  }
+}
