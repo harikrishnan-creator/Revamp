@@ -121,8 +121,7 @@ stage('Verify EKS creation') {
     }
 }
 }
-stages {
-    stage('Replace Image in Manifest') {
+ stage('Replace Image in Manifest') {
         steps {
             script {
                 withAWS(credentials: 'aws-credentials', region: "${ AWS_REGION }") {
@@ -158,8 +157,6 @@ stage('Verify Deployment') {
                 echo "Deployment verified successfully!"
             }
     }
-}
-}
 }
 }
 
